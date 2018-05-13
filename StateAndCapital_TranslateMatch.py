@@ -57,14 +57,15 @@ cw={'阿拉巴马':'蒙哥马利','阿拉斯加':'朱诺','亚利桑那州':'凤
 	'佛蒙特州':'蒙彼利埃','弗吉尼亚':'里士满','华盛顿':'奥林匹亚',
 	'西弗吉尼亚':'查尔斯顿','威斯康星':'麦迪逊','怀俄明':'夏延'}
 
-import pyperclip   #制造规矩的的字典 包括冒号和逗号的更替
+#制造规矩的的字典(包括冒号和逗号的替换)，复制到剪贴板粘贴再加上大括号组装成新的字典
+import pyperclip   
 replace_cw1 = cw_old.replace('：',':') 
 replace_cw2 = replace_cw1.replace('，',',') 
 a= pyperclip.copy(replace_cw2)
 b= pyperclip.paste()
 
-
-ew_keys = list(ew.keys()) #字典中分别取出键和值分别存为有序的列表,等待重组
+#字典中分别取出键和值各自存为有序的列表,等待重组
+ew_keys = list(ew.keys()) 
 ew_values = list(ew.values())
 cw_keys = list(cw.keys())
 cw_values = list(cw.values())
@@ -72,14 +73,14 @@ cw_values = list(cw.values())
 #格式模式 : 'Alabama'阿拉巴马: 'Montgomery'蒙哥马利
 
 print ('*'*61)	
-#利用python自带的zip函数可同时对两个列表进行遍历
+#利用python自带的zip函数可同时对两个列表进行遍历，重组，漂亮打印
 for a,b,c,d in zip(ew_keys,cw_keys,ew_values,cw_values):  
 	print ("{:<14}{:>8}{}{:<15}{:>8}".format(a,b,' '*(12-len(b)),c,d) )
 print ('*'*61)
 		
 		
 		
-#此处有彩蛋 手稿Script
+#此处有彩蛋 思路手稿Script
 """
 todo：
 让两个列表中的键和键对应起来，值和值对应起来

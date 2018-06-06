@@ -1,5 +1,5 @@
 #将英文地名和州首府 做对应翻译，漂亮打印！
-#技能包：pyperclip（）；字典 列表方法  ；zip 多重遍历
+#技能包：pyperclip（）；字典 列表方法 ；zip 并行遍历
 
 ew = {'Alabama': 'Montgomery', 'Alaska': 'Juneau', 'Arizona': 'Phoenix',
 	'Arkansas': 'Little Rock', 'California': 'Sacramento', 'Colorado': 'Denver',
@@ -64,13 +64,13 @@ replace_cw2 = replace_cw1.replace('，',',')
 a= pyperclip.copy(replace_cw2)
 b= pyperclip.paste()
 
-#字典中分别取出键和值各自存为有序的列表,等待重组
+# 字典中分别取出键和值各自存为有序的列表,等待重组
 ew_keys = list(ew.keys()) 
 ew_values = list(ew.values())
 cw_keys = list(cw.keys())
 cw_values = list(cw.values())
 
-#格式模式 : 'Alabama'阿拉巴马: 'Montgomery'蒙哥马利
+# 格式模式 : 'Alabama'阿拉巴马: 'Montgomery'蒙哥马利
 
 print ('*'*61)	
 # zip函数：并行遍历 

@@ -73,7 +73,7 @@ cw_values = list(cw.values())
 #格式模式 : 'Alabama'阿拉巴马: 'Montgomery'蒙哥马利
 
 print ('*'*61)	
-#利用python自带的zip函数可同时对两个列表进行遍历，重组，漂亮打印
+# zip函数：并行遍历 
 for a,b,c,d in zip(ew_keys,cw_keys,ew_values,cw_values):  
 	print ("{:<14}{:>8}{}{:<15}{:>8}".format(a,b,' '*(12-len(b)),c,d) )
 print ('*'*61)

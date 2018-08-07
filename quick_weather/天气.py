@@ -3,7 +3,6 @@
 import sys
 import json
 import requests
-import logging
 
 
 # 从命令行参数获取位置
@@ -12,7 +11,6 @@ def recv_location():
         print('Usage: weather 北京')
         sys.exit()
     location = str(sys.argv[1])
-    logging.debug(location)
     main(location)
 
 

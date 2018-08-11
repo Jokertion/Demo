@@ -1,5 +1,5 @@
 # ！ python3
-# house.py
+# soldier.py
 """
 枪与士兵
 需求：

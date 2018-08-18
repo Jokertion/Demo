@@ -14,7 +14,6 @@ class Interval:
         self.day = day
 
     def now_to_date(self):
-
         # 从现在时间计算：
         # start = datetime.datetime.fromtimestamp(time.time())
         # 从指定日期计算：
@@ -45,7 +44,6 @@ class Date:
         self.days = days
 
     def now_and_delta(self):
-
         # 从当前时间开始计算：
         # start = datetime.datetime.fromtimestamp(time.time())
 
@@ -62,7 +60,7 @@ class Date:
 # date1 = Interval(2018, 9, 16)
 date1 = Interval(2018, 8, 13)
 date1.now_to_date()
-print('*'*50)
+print('*' * 50)
 # 知间隔求日期
 date2 = Date(600)
 date3 = Date(1000)
@@ -71,8 +69,6 @@ date5 = Date(5000)
 date6 = Date(10000)
 date7 = Date(25000)
 
-
-
 date2.now_and_delta()
 date3.now_and_delta()
 date4.now_and_delta()
@@ -80,4 +76,4 @@ date5.now_and_delta()
 date6.now_and_delta()
 date7.now_and_delta()
 print('到这一天，我92岁，如果依然活着，愿爱你如初')
-print('*'*50)
+print('*' * 50)

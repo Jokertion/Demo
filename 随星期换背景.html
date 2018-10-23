@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script>
+
+        window.onload = function () {
+            var oBody = document.getElementById('body01');
+            var oInput = document.getElementById('input01');
+            var oBton = document.getElementById('bton');
+
+            oBton.onclick = function () {
+                if (oInput.value == 1) {
+                    oBody.style.backgroundColor = 'red';
+                }
+                else if (oInput.value == 2) {
+                    oBody.style.backgroundColor = 'orange';
+                }
+                else if (oInput.value == 3) {
+                    oBody.style.backgroundColor = 'yellow';
+                }
+                else if (oInput.value == 4) {
+                    oBody.style.backgroundColor = 'green';
+                }
+                else if (oInput.value == 5) {
+                    oBody.style.backgroundColor = 'cyan';
+                }
+                else if (oInput.value == 6) {
+                    oBody.style.backgroundColor = 'blue';
+                }
+                else if (oInput.value == 7) {
+                    oBody.style.backgroundColor = 'purple';
+                }
+                else {
+                    alert('请输入1-7的数字！');
+                }
+            }
+
+        }
+
+    </script>
+</head>
+<body id="body01">
+<div>请输入今天星期几</div>
+    <input type="text" name="星期" value="" id="input01">
+    <input type="button" value="一键换肤" id="bton">
+</body>
+</html>

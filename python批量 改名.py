@@ -12,4 +12,4 @@ def c_name(path):
 
 if __name__ == '__main__':
     path = 'C:\\Users\\Administrator\\Desktop\\崔庆才爬虫视频'
-    c_name()
+    c_name(path)

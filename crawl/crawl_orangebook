@@ -1,0 +1,307 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+@作者：liangmingshen
+@文件名：orange_book_update.py
+@文档说明:
+爬取日本橙皮书（http://www.jp-orangebook.gr.jp/cgi-bin/search/search_e.cgi）的药品信息：
+1、根据字母索引进入对应药品的[Detail]页面进行数据捕获；
+2、药品编号使用jpb+毫秒时间+6位随机数；
+3、分解成三张表存储信息：
+1）一张基础信息表保存Therapeutic Classification、Specification and Unit等六项基础信息；
+2）一张品牌关联表保存Step、JP Codex等八项信息；
+3）对于BE存在值的爬取Brand Name、T1/2等九项信息以及图片
+4、将爬取的信息以excel的方式导出
+"""
+
+import requests
+import re
+from bs4 import BeautifulSoup
+import pymysql
+import time
+import random
+from urllib import parse
+import traceback
+
+
+def crawl_detail_base_info():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64)\
+        AppleWebKit/537.36 (KHTML, like Gecko)\
+        Chrome/69.0.3497.100 Safari/537.36",
+        "upgrade-insecure-requests": '1',
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+        "Host": "www.jp-orangebook.gr.jp",
+    }
+
+    # 字母排序的页面--初始页
+    c_lst = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+    for c in c_lst:
+        url = "http://www.jp-orangebook.gr.jp/cgi-bin/search/search_e.cgi?\
+        action=list&proc=general&word={0}&key=".format(c)
+        response = requests.get(url, headers=headers, timeout=None)
+        html = response.text
+
+        # 找到初始页面的所有[detail]的href（存为add_url_list）
+        parses = r'<td bgcolor=#FFFFDD><a href="./(.*?)"'
+        add_url_list = re.findall(parses, html, re.S)
+
+        # 将add_url中特殊字符转码或替换,并构造完整url
+        base_url_list = []
+        for add_url in add_url_list:
+            if '－' in add_url:
+                add_url = add_url.replace('－', '%81|')
+                new_add_url = add_url.replace(' ', '%20')
+                base_url = 'http://www.jp-orangebook.gr.jp/cgi-bin/search/' + new_add_url
+                base_url_list.append(base_url)
+                # full_url = base_url.replace('frame', 'main')
+                # print(full_url)
+            else:
+                wait_to_parse = str(re.findall(r'find=(.*)', add_url)[0])  # 找到需要转换编码的部分
+                name_parse = parse.quote(wait_to_parse, encoding='shift-jis')  # 转换shift-jis编码
+                new_add_url = re.sub(r'find=(.*)', 'find=' + name_parse, add_url)  # 将转换后的替换原来的
+                base_url = 'http://www.jp-orangebook.gr.jp/cgi-bin/search/' + new_add_url
+                base_url_list.append(base_url)
+                # full_url = base_url.replace('frame', 'main')
+                # print(full_url)
+            # print(count)
+
+        # 构造详情页上半部分（药品基础信息）的url列表
+        up_data_url_list = []
+        for b_u in base_url_list:
+            up_data_add_url = b_u.replace('frame', 'header')
+            up_data_url_list.append(up_data_add_url)
+        # for i in enumerate(up_data_url_list):
+        #     print(i)
+
+        # 爬取并存储详情页上半部分六项数据（药品基础信息）
+        for url in up_data_url_list:
+            response = requests.get(url, headers=headers, timeout=None)
+            html = response.text
+            soup = BeautifulSoup(html, 'lxml')
+            data = {
+                'therapeutic_classification': int(soup.select('.bb')[0].string) if soup.select('.bb')[
+                    0].string else 'Null',
+                'therapeutic_category': str(soup.select('.bb')[1].string) if soup.select('.bb')[1].string else 'Null',
+                'nonproprietary_name': str(soup.select('.bb')[2].string) if soup.select('.bb')[2].string else 'Null',
+                'dosage_forms': str(soup.select('.bb')[3].string) if soup.select('.bb')[3].string else 'Null',
+                'product_characteristics': str(soup.select('.bb')[4].string) if soup.select('.bb')[
+                    4].string else 'Null',
+                'specification_and_unit': str(soup.select('.bb')[5].string) if soup.select('.bb')[5].string else 'Null'
+            }
+
+            # 药品编号使用jpb+毫秒时间+6位随机数
+            t = int(round(time.time() * 1000))
+            rd_num = random.randint(100000, 999999)
+            code = 'jpb' + str(t) + str(rd_num)
+            # print(code)
+            # noinspection PyBroadException
+            try:
+                d_01 = data['therapeutic_classification']
+                d_02 = data['therapeutic_category']
+                d_03 = data['nonproprietary_name']
+                d_04 = data['dosage_forms']
+                d_05 = data['product_characteristics']
+                d_06 = data['specification_and_unit']
+                sql = 'INSERT INTO base_info(code, therapeutic_classification, therapeutic_category,\
+                 nonproprietary_name, dosage_forms, product_characteristics, specification_and_unit) \
+                 values(%s, %s, %s, %s, %s, %s, %s)'
+                cursor.execute(sql, (code, d_01, d_02, d_03, d_04, d_05, d_06))
+                print('{0}已存入基本信息表'.format((code, d_01, d_02, d_03, d_04, d_05, d_06)))
+                db.commit()
+
+                # 存储品牌关联信息
+                crawl_detail_brand(url, code)
+            except Exception:
+                traceback.print_exc()
+                db.rollback()
+    db.close()
+
+
+def crawl_detail_brand(url, code):
+    # 构造下半部分数据的url
+    brand_url = url.replace('header', 'main')
+    response = requests.get(brand_url, timeout=None)
+
+    html = response.text
+    soup = BeautifulSoup(html, 'lxml')
+
+    # 爬取并存储详情页下半部分八项数据（品牌关联）
+    trs = soup.find_all('table')[1].find_all('tr')
+    for tr in trs:
+        lst = []
+        for div in tr('div'):
+            if div.find_all(lambda x: x.name != '', recursive=False) == []:  # 找children为空的数据标签
+                lst.append(div.string)
+        data = {'step': lst[0] if lst[0] else 'Null',
+                'standard_product': lst[1] if lst[1] else 'Null',
+                'brand_name': lst[2] if lst[2] else 'Null',
+                'company': lst[3] if lst[3] else 'Null',
+                'content': lst[4] if lst[4] else 'Null',
+                'drug_price': lst[5].replace(',', '') if lst[5] else 'Null',
+                'generic_drug': lst[6] if lst[6] else 'Null',
+                'jp_codex': lst[7] if lst[7] else 'Null',
+                }
+        # noinspection PyBroadException
+        try:
+            d_01 = data['step']
+            d_02 = data['standard_product']
+            d_03 = data['brand_name']
+            d_04 = data['company']
+            d_05 = data['content']
+            d_06 = float(data['drug_price'])
+            d_07 = data['generic_drug']
+            d_08 = data['jp_codex']
+            sql = 'INSERT INTO brand(step, standard_product, brand_name, company, content, \
+            drug_price, generic_drug, jp_codex, code) values(%s, %s, %s, %s, %s, %s, %s, %s, %s)'
+            cursor.execute(sql, (d_01, d_02, d_03, d_04, d_05, d_06, d_07, d_08, code))
+            db.commit()
+            print('{0}已经存入品牌关联表'.format((d_01, d_02, d_03, d_04, d_05, d_06, d_07, d_08, code)))
+        except Exception:
+            traceback.print_exc()
+            # print('Failed')
+            db.rollback()
+    # db.close()
+
+
+def crawl_be_base_info():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64)\
+            AppleWebKit/537.36 (KHTML, like Gecko)\
+            Chrome/69.0.3497.100 Safari/537.36",
+        "upgrade-insecure-requests": '1',
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+        "Host": "www.jp-orangebook.gr.jp",
+    }
+
+    c_lst = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+    for c in c_lst:
+        u = "http://www.jp-orangebook.gr.jp/cgi-bin/search/search_e.cgi?action=list&proc=general&word={0}&key="
+        url = u.format(c)
+        response = requests.get(url, headers=headers, timeout=None)
+        html = response.text
+
+        # 找到BE有内容的URL
+        parses = r'href="(.*?)" target=_blank'
+        add_url_list = re.findall(parses, html, re.S | re.M)
+
+        # 构造 BE详情页 的完整url，存为列表 full_url_list
+        full_url_list = []
+        for add_url in add_url_list:
+            if 'equ_' in add_url:
+                add_url = add_url.replace('frame', 'main')[1:]
+                full_url = 'http://www.jp-orangebook.gr.jp/cgi-bin/search' + add_url
+                full_url_list.append(full_url)
+                # 测试
+        #         print(full_url)
+        # print(len(full_url_list))
+
+        # 根据URL中药名字段(nonproprietary_name)+编号字段(therapeutic_classification)查询base_info的code值
+        for url in full_url_list:
+            code_lst = []
+            num = int(re.findall(r'effect=(\d\d\d)&', url)[0])
+            name = re.findall(r'find=(.*)', url)[0]
+            print(num, name, end=' ')
+            # noinspection PyBroadException
+            try:
+                # 查询数据库
+                sql = 'SELECT code from base_info WHERE \
+                nonproprietary_name = %s and therapeutic_classification = %s'
+                cursor.execute(sql, (name, num))
+                code_results = cursor.fetchall()
+                for code in code_results:
+                    code_lst.append(code)
+                    # print(code)
+            except Exception:
+                traceback.print_exc()
+                # print('Error')
+
+            # 爬取 BE详情页面10项数据
+            response = requests.get(url, timeout=None)
+            html = response.text
+            # print(html)
+
+            # 爬取并存储BE页面10项基本数据
+            soup = BeautifulSoup(html, 'lxml')
+            trs = soup.find_all('table')[1].find_all('tr')
+            for tr in trs:  # tr:每一整行的数据
+                lst = []  # 一条完整的数据（包含9项）
+                graph_list = []  # 图片数据
+
+                # 每条数据的基本信息存入数据库
+                for td in tr('td'):
+                    div = td('div')[1]  # 10项数据的标签
+
+                    # 爬取graph
+                    if div('a'):
+                        # 构造图片页面的url
+                        graph_page_add_url = div.find('a')['href']
+                        pic_url = 'http://www.jp-orangebook.gr.jp/cgi-bin/search' + graph_page_add_url[1:]
+                        # 获取图片页面
+                        response = requests.get(pic_url, timeout=None)
+                        graph_html = response.text
+                        # 构造图片的url
+                        soup = BeautifulSoup(graph_html, 'lxml')
+                        graph_add_url = soup.select('td > div')[-3].a['href']
+                        graph_full_url = 'http://www.jp-orangebook.gr.jp/' + graph_add_url[6:]
+                        graph_list.append(graph_full_url)
+                        break
+                        # print(div.find('a')['href'])
+
+                    # TODO:解决get_text()会忽略br，把文本混在一起的问题
+
+                    # 获取9项基本数据
+                    # s = div.get_text()
+
+                    s = div.get_text(';', '<br>')
+                    lst.append(s)
+                # print(lst)
+                data = {'brand_name': lst[0].strip() if lst[0] else '',
+                        'n_numbers': lst[1].strip() if lst[1] else '',
+                        'dose': lst[2].replace(';', '').strip() if lst[2] else '',
+                        'auc_unit': lst[3].replace(';', '').strip() if lst[3] else '',
+                        'classification': lst[4].strip() if lst[4] else '',
+                        'auc': lst[5].replace(',', '').strip() if lst[5] else '',
+                        'cmax': lst[6].strip() if lst[6] else '',
+                        'tmax': lst[7].strip() if lst[7] else '',
+                        't1_2': lst[8].strip() if lst[8] else '',
+                        'graph': graph_list[0].strip(),
+                        }
+                # print(data)
+                # noinspection PyBroadException
+                try:
+                    d_01 = data['brand_name']
+                    d_02 = data['n_numbers']
+                    d_03 = data['dose']
+                    d_04 = data['auc_unit']
+                    d_05 = data['classification']
+                    d_06 = data['auc']
+                    d_07 = data['cmax']
+                    d_08 = data['tmax']
+                    d_09 = data['t1_2']
+                    d_10 = data['graph']
+                    sql = 'INSERT INTO be_copy1(brand_name, n_numbers, dose, \
+                    auc_unit, classification, auc, cmax, tmax, t1_2, graph, code) \
+                    values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
+                    cursor.execute(sql, (d_01, d_02, d_03, d_04, d_05, d_06, d_07, d_08, d_09, d_10, code_lst[0]))
+                    db.commit()
+                    print(
+                        '{0}已经存入数据库'.format((d_01, d_02, d_03, d_04, d_05, d_06, d_07, d_08, d_09, d_10, code_lst[0])))
+                except Exception:
+                    traceback.print_exc()
+                    # print('Failed')
+                    db.rollback()
+    db.close()
+
+
+if __name__ == "__main__":
+    db = pymysql.connect(host='localhost', user='root', password='root', port=3306, db='spiders')
+    cursor = db.cursor()
+    # crawl_detail_base_info()
+    crawl_be_base_info()
+
+
+
+

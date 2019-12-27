@@ -3,7 +3,7 @@
 import random
 
 
-def sample_divided_by_random2(sample_list, groups=4):
+def sample_divided_by_random(sample_list, groups=2):
     """
     样本随机分组--升级版
     :param sample_list:  样本列表
@@ -27,4 +27,5 @@ def sample_divided_by_random2(sample_list, groups=4):
 
 if __name__ == '__main__':
     t = [2, 4, 5, 8, 11, 60, 47, 32, 15, 44, 30, 83]
-    sample_divided_by_random2(t)
+    sample_divided_by_random(t)
+

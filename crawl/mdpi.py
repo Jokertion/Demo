@@ -28,11 +28,11 @@ MONTH = {'Nov': '11',
          'Jan': '01',
          'Dec': '12'}
 IGNORE_LIST = ['agronomy', 'animals']
-mysql_host = "127.0.0.1"
-mysql_user = "root"
-mysql_password = "root"
-mysql_db = 'mdpi'
-headers = {
+HOST = "127.0.0.1"
+USER = "root"
+PASSWORD = "root"
+DB = 'mdpi'
+HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/76.0.3809.132 Safari/537.36',
     "Referer": 'https://www.mdpi.com/about/journals'
@@ -54,12 +54,14 @@ async def count_all_page(cur, journal):
     return page_num
 
 
-def count_end_page(count):
-    end_page_num = int(count) // 10 if int(count) % 10 == 0 else int(count) // 10 + 1
-    return end_page_num
-
-
 async def parse(cur, res, journal):
+    """
+    解析列表页
+    :param cur:
+    :param res:
+    :param journal:
+    :return:
+    """
     # 列表页每一块的内容
     article_cons = res.xpath(
         "//div[@class='jscroll']/div[@class='generic-item article-item']/div[@class='article-content']")
@@ -94,7 +96,7 @@ async def send_request(session, url):
     """
     while True:
         try:
-            response = await session.get(url, headers=headers, timeout=10)
+            response = await session.get(url, headers=HEADERS, timeout=10)
             res = html.etree.HTML(await response.text())
             if response.status == 200:
                 return res
@@ -107,6 +109,12 @@ async def send_request(session, url):
 
 
 async def article_exist(cur, article_url):
+    """
+    判断文章是否跑过
+    :param cur:
+    :param article_url:
+    :return:
+    """
     check_sql = 'select id from article_status where article_url=%s'
     await cur.execute(check_sql, (article_url,))
     res = await cur.fetchone()
@@ -114,32 +122,6 @@ async def article_exist(cur, article_url):
         print(f"文章{article_url}已在库中存在")
         return True
     return False
-
-
-async def get_url_list(start_page_num, end_page_num, journal):
-    url_list = []
-    for page in range(start_page_num, end_page_num + 1):
-        url = f'https://www.mdpi.com/search?sort=pubdate&page_no={page}&page_count=10&year_from=1996&year_to=2020&journal={journal}&view=default'
-        url_list.append(url)
-    return url_list
-
-
-async def request_and_parse(session, cur, url, journal):
-    res = await send_request(session, url)
-    await parse(cur, res, journal)
-    await asyncio.sleep(2)
-
-
-async def do_something(session, cur, journal, url_list):
-    tasks = []
-    for url in url_list:
-        # 此处一定要使用create_task，不能直接await，否则不能并发运行
-        task = asyncio.create_task(request_and_parse(session, cur, url, journal))
-        tasks.append(task)
-
-    # 等待所有任务执行完毕
-    for task in tasks:
-        await task
 
 
 async def screen_journal(cur):
@@ -158,26 +140,69 @@ async def screen_journal(cur):
     return all_journl_dict
 
 
+async def get_url_list(start_page_num, end_page_num, journal):
+    """
+    构造期刊所有列表页的url
+    :param start_page_num:
+    :param end_page_num:
+    :param journal:
+    :return:
+    """
+    url_list = []
+    for page in range(start_page_num, end_page_num + 1):
+        url = f'https://www.mdpi.com/search?sort=pubdate&page_no={page}&page_count=10&year_from=1996&year_to=2020&journal={journal}&view=default'
+        url_list.append(url)
+    return url_list
+
+
+async def request_and_parse(session, cur, url, journal):
+    """
+    将请求和解析聚合
+    :param session:
+    :param cur:
+    :param url:
+    :param journal:
+    :return:
+    """
+    res = await send_request(session, url)
+    await parse(cur, res, journal)
+    await asyncio.sleep(2)
+
+
+async def do_something(session, cur, journal, url_list):
+    """
+    聚合协程 分配任务
+    :param session:
+    :param cur:
+    :param journal:
+    :param url_list:
+    :return:
+    """
+    tasks = []
+    for url in url_list:
+        # 此处一定要使用create_task，不能直接await，否则不能并发运行
+        task = asyncio.create_task(request_and_parse(session, cur, url, journal))
+        tasks.append(task)
+
+    # 等待所有任务执行完毕
+    for task in tasks:
+        await task
+
+
 async def main():
     session = aiohttp.ClientSession()
     loop = asyncio.get_event_loop()
-    conn = await aiomysql.connect(host=mysql_host, port=3306,
-                                  user=mysql_user, password=mysql_password,
-                                  db=mysql_db, loop=loop)
-    cur = await conn.cursor()
-    journl_dict = await screen_journal(cur)
-    for journal, pages in journl_dict.items():
-        if journal in IGNORE_LIST:
-            continue
-        # start_page_num = count_strat_page(journal)
-        start_page_num = 1
-        all_page_num = await count_all_page(cur, journal)
-        url_list = await get_url_list(start_page_num, all_page_num, journal)
-
-        await do_something(session, cur, journal, url_list)
-
     try:
-        loop.run_until_complete(do_something)
+        conn = await aiomysql.connect(host=HOST, port=3306, user=USER, password=PASSWORD, db=DB, loop=loop)
+        cur = await conn.cursor()
+        journl_dict = await screen_journal(cur)
+        for journal, pages in journl_dict.items():
+            if journal in IGNORE_LIST:
+                continue
+            start_page_num = 1
+            all_page_num = await count_all_page(cur, journal)
+            url_list = await get_url_list(start_page_num, all_page_num, journal)
+            await do_something(session, cur, journal, url_list)
     finally:
         loop.close()
 
